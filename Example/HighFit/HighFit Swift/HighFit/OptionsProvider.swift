@@ -11,13 +11,16 @@ import Highcharts
 
 class OptionsProvider {
     
-    class func provideOptions(forChartType options: [String: Any], series: [Any], type: String) -> HIOptions {
+    class func provideOptions(forChartType options: [String: Any], series: [Any], type: String, _ multiple: Int = 0, _ panningClosure: HIClosure? = nil) -> HIOptions {
         var categories = [String]()
         var step: NSNumber?
         
         if type == "day" {
             categories = ["12AM", "", "3AM", "", "6AM", "", "9AM", "", "12PM", "", "3PM", "", "6PM", "", "9PM", "", "12AM"]
             step = 1
+            for _ in (0..<multiple) where multiple > 0 {
+                categories += categories
+            }
         }
         
         if type == "week" {
@@ -134,6 +137,11 @@ class OptionsProvider {
             chart.backgroundColor = HIColor(linearGradient: ["x1": 0, "y1": 0, "x2": 0, "y2": 1], stops: [[0, "rgb(66, 218, 113)"], [1, "rgb(80, 140, 200)"]])
             chart.borderRadius = 6
             chart.type = (options["chartType"] as! String)
+            chart.panning = HIPanning()
+            chart.panning.enabled = true
+            chart.panning.type = "x"
+            chart.events = HIEvents()
+            chart.events.load = HIFunction(jsFunction: "function() { var proceed = this.pointer.pinch; this.pointer.pinch = function(e) { if (e.touches.length === 1 && e.type === 'touchmove') { this.chart.pan(e, this.chart.options.panning); } else { proceed.call(this, e); if (e.type === 'touchstart') { this.chart.mouseDownX = this.pinchDown[0].chartX; this.chart.mouseDownY = this.pinchDown[0].chartY; } } } }")
             hioptions.chart = chart
             
             let exporting = HIExporting()
@@ -183,6 +191,7 @@ class OptionsProvider {
             
             let tooltip = HITooltip()
             tooltip.headerFormat = ""
+//            tooltip.followTouchMove = false
             hioptions.tooltip = tooltip
             
             let xaxis = HIXAxis()
@@ -194,6 +203,17 @@ class OptionsProvider {
             xaxis.labels.style.textOutline = "10px Arial"
             xaxis.labels.step = step
             xaxis.categories = categories
+            xaxis.min = 6
+            xaxis.max = 11
+            xaxis.events = HIEvents()
+            xaxis.events.afterSetExtremes = HIFunction(closure: { context in
+                guard let context = context,
+                    let currentMin = context.getProperty("event.min") as? Double,
+                    let currentMax = context.getProperty("event.max") as? Double else { return }
+                print("Min: \(currentMin) , Max: \(currentMax)")
+                
+                panningClosure?(context)
+            }, properties: ["event.min", "event.max", "event.dataMin", "event.dataMax"])
             hioptions.xAxis = [xaxis]
             
             let yaxis = HIYAxis()
@@ -209,12 +229,16 @@ class OptionsProvider {
             yaxis.title.text = ""
             hioptions.yAxis = [yaxis]
             
+            var seriesData = series
+            for _ in 0..<multiple where multiple > 0 {
+                seriesData += series
+            }
             let column = HIColumn()
             column.tooltip = HITooltip()
             column.tooltip.headerFormat = ""
             column.tooltip.valueSuffix = " kcal"
             column.showInLegend = false
-            column.data = series
+            column.data = seriesData
             column.name = (options["title"] as! String)
             hioptions.series = [column]
             

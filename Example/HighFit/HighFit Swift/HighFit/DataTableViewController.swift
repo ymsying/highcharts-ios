@@ -99,7 +99,25 @@ class DataTableViewController: UITableViewController, HIChartViewDelegate {
             
             tmpOptions["subtitle"] = "\(sum) \(tmpOptions["unit"]!)"
             
-            self.chartView.options = OptionsProvider.provideOptions(forChartType: tmpOptions, series: series, type: "day")
+            var page = 0
+            func panningClosure(context: HIChartContext?) {
+                guard let context = context,
+                    let dataMax = context.getProperty("event.dataMax") as? Double,
+                    let dataMin = context.getProperty("event.dataMin") as? Double,
+                    let currentMin = context.getProperty("event.min") as? Double,
+                    let currentMax = context.getProperty("event.max") as? Double else { return }
+                print("Min: \(currentMin) , Max: \(currentMax)")
+                
+                if (dataMin-5..<dataMin-4.9).contains(currentMin) {
+                    page -= 1
+                    self.chartView.options = OptionsProvider.provideOptions(forChartType: tmpOptions, series: series, type: "day", page, panningClosure)
+                } else if (dataMax-5..<dataMax-4).contains(currentMax) {
+                    page += 1
+                    print("page: \(page)")
+                    self.chartView.options = OptionsProvider.provideOptions(forChartType: tmpOptions, series: series, type: "day", page, panningClosure)
+                }
+            }
+            self.chartView.options = OptionsProvider.provideOptions(forChartType: tmpOptions, series: series, type: "day", page, panningClosure)
             self.chartView.viewController = self
             
             self.chartViewBase.addSubview(self.chartView!)
